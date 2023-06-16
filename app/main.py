@@ -18,6 +18,7 @@ from google.cloud import bigquery, storage
 from google.oauth2 import service_account
 
 from fastapi.responses import HTMLResponse
+import pandas as pd
 
 load_dotenv('.env')
 
@@ -26,6 +27,12 @@ bigquery_client = bigquery.Client.from_service_account_json(key_path)
 storage_client = storage.Client.from_service_account_json(key_path)
 
 app = FastAPI()
+
+def download_blob(bucket_name, source_file_name, dest_filename):
+    bucket = storage_client.get_bucket(bucket_name)
+    blob = bucket.blob(source_file_name)
+    f = open(dest_filename,'wb')
+    blob.download_to_file(f)
 
 # to avoid csrftokenError
 # app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
@@ -39,11 +46,14 @@ async def root():
 
 @app.post('/book/', response_model=SchemaBook)
 async def book(book: SchemaBook):
+   print(book)
+   return 1
    query = f"""
-   INSERT INTO {project_id}.Books.books VALUES("4","abcd","2","abcd");
+   INSERT INTO {project_id}.Books.books VALUES({book});
    """
-   client.query(query)
+   db_book = bigquery_client.query(query)
    return db_book
+
 
 @app.get('/books/',response_class=HTMLResponse)
 async def book():
@@ -62,10 +72,14 @@ async def author(author:SchemaAuthor):
    db.session.commit()
    return db_author
 
-@app.get('/authors/')
+@app.get('/authors/',response_class=HTMLResponse)
 async def author():
-   
-   return author
+   bucket_name = "bucket-gautami"
+   source_file_name = "data/mnist_test.csv"
+   dest_filename = "mnist_data.csv"
+   download_blob(bucket_name, source_file_name, dest_filename)
+   df = pd.read_csv(dest_filename)
+   return df.head().to_html()
 
 
 # To run locally
