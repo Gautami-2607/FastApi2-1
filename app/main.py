@@ -14,12 +14,23 @@ from app.models import Author as ModelAuthor
 import os
 from dotenv import load_dotenv
 
+from google.cloud import bigquery, storage
+from google.oauth2 import service_account
+
+from fastapi.responses import HTMLResponse
+
 load_dotenv('.env')
+
+key_path = "cloudkarya-internship-32c8df6a1507.json"
+bigquery_client = bigquery.Client.from_service_account_json(key_path)
+storage_client = storage.Client.from_service_account_json(key_path)
 
 app = FastAPI()
 
 # to avoid csrftokenError
-app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+# app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+
+project_id = "cloudkarya-internship"
 
 @app.get("/")
 async def root():
@@ -28,15 +39,20 @@ async def root():
 
 @app.post('/book/', response_model=SchemaBook)
 async def book(book: SchemaBook):
-   db_book = ModelBook(title=book.title, rating=book.rating, author_id = book.author_id)
-   db.session.add(db_book)
-   db.session.commit()
+   query = f"""
+   INSERT INTO {project_id}.Books.books VALUES("4","abcd","2","abcd");
+   """
+   client.query(query)
    return db_book
 
-@app.get('/books/')
+@app.get('/books/',response_class=HTMLResponse)
 async def book():
-   book = db.session.query(ModelBook).all()
-   return book
+   query = f"""
+         SELECT  * FROM {project_id}.Books.books;
+   """
+   df = bigquery_client.query(query).to_dataframe()
+   # df.head()
+   return df.to_html()
 
 
 @app.post('/author/', response_model=SchemaAuthor)
@@ -48,7 +64,7 @@ async def author(author:SchemaAuthor):
 
 @app.get('/authors/')
 async def author():
-   author = db.session.query(ModelAuthor).all()
+   
    return author
 
 
